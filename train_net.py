@@ -45,6 +45,7 @@ from detectron2.evaluation import (
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
+from detectron2.data.datasets import register_coco_instances
 
 # MaskFormer
 from mask2former import (
@@ -298,6 +299,11 @@ def setup(args):
 def main(args):
     cfg = setup(args)
 
+    if 'armbench_train' in cfg.DATASETS.TRAIN:
+        register_coco_instances('armbench_train', {}, 'datasets/armbench/mix-object-tote/train.json', 'datasets/armbench/mix-object-tote/images')
+    if 'armbench_val' in cfg.DATASETS.TEST:
+        register_coco_instances('armbench_val', {}, 'datasets/armbench/mix-object-tote/val.json', 'datasets/armbench/mix-object-tote/images')
+    
     if args.eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(

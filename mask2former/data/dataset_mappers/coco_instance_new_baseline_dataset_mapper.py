@@ -42,28 +42,47 @@ def build_transform_gen(cfg, is_train):
         list[Augmentation]
     """
     assert is_train, "Only support training augmentation"
-    image_size = cfg.INPUT.IMAGE_SIZE
-    min_scale = cfg.INPUT.MIN_SCALE
-    max_scale = cfg.INPUT.MAX_SCALE
+    if 'armbench_train' in cfg.DATASETS.TRAIN:
+        min_size = cfg.INPUT.MIN_SIZE_TRAIN
+        max_size = cfg.INPUT.MAX_SIZE_TRAIN
+        sample_style = cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING
 
-    augmentation = []
-
-    if cfg.INPUT.RANDOM_FLIP != "none":
-        augmentation.append(
-            T.RandomFlip(
-                horizontal=cfg.INPUT.RANDOM_FLIP == "horizontal",
-                vertical=cfg.INPUT.RANDOM_FLIP == "vertical",
+        if sample_style == "range":
+            assert len(min_size) == 2, "more than 2 ({}) min_size(s) are provided for ranges".format(
+                len(min_size)
             )
-        )
 
-    augmentation.extend([
-        T.ResizeScale(
-            min_scale=min_scale, max_scale=max_scale, target_height=image_size, target_width=image_size
-        ),
-        T.FixedSizeCrop(crop_size=(image_size, image_size)),
-    ])
+        logger = logging.getLogger(__name__)
+        tfm_gens = []
+        tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+        if is_train:
+            tfm_gens.append(T.RandomFlip())
+            logger.info("TransformGens used in training: " + str(tfm_gens))
+        return tfm_gens
 
-    return augmentation
+    else:
+        image_size = cfg.INPUT.IMAGE_SIZE
+        min_scale = cfg.INPUT.MIN_SCALE
+        max_scale = cfg.INPUT.MAX_SCALE
+
+        augmentation = []
+
+        if cfg.INPUT.RANDOM_FLIP != "none":
+            augmentation.append(
+                T.RandomFlip(
+                    horizontal=cfg.INPUT.RANDOM_FLIP == "horizontal",
+                    vertical=cfg.INPUT.RANDOM_FLIP == "vertical",
+                )
+            )
+
+        augmentation.extend([
+            T.ResizeScale(
+                min_scale=min_scale, max_scale=max_scale, target_height=image_size, target_width=image_size
+            ),
+            T.FixedSizeCrop(crop_size=(image_size, image_size)),
+        ])
+
+        return augmentation
 
 
 # This is specifically designed for the COCO dataset.
