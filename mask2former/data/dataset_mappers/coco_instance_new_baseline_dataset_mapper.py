@@ -42,7 +42,8 @@ def build_transform_gen(cfg, is_train):
         list[Augmentation]
     """
     assert is_train, "Only support training augmentation"
-    if 'armbench_train' in cfg.DATASETS.TRAIN:
+    # if 'armbench_train' in cfg.DATASETS.TRAIN or 'coco_2017_train' in cfg.DATASETS.TRAIN:
+    if cfg.INPUT.IMAGE_SIZE == 800:
         min_size = cfg.INPUT.MIN_SIZE_TRAIN
         max_size = cfg.INPUT.MAX_SIZE_TRAIN
         sample_style = cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING

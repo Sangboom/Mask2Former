@@ -306,6 +306,16 @@ def main(args):
     
     if args.eval_only:
         model = Trainer.build_model(cfg)
+        from fvcore.nn.parameter_count import parameter_count_table
+        print(parameter_count_table(model, max_depth=10))
+
+        # from fvcore.nn import flop_count_table, FlopCountAnalysis
+        # input = (torch.rand((1, 3, 800, 800)),)
+        # flops = FlopCountAnalysis(model, input)
+        # print(flops.total())
+        # print(flop_count_table(flops))
+        # import time
+        # time.sleep(1000)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
