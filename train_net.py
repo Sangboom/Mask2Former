@@ -289,6 +289,7 @@ def setup(args):
     add_maskformer2_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+    cfg.OUTPUT_DIR = args.config_file[:-5].replace("configs", "output")
     cfg.freeze()
     default_setup(cfg, args)
     # Setup logger for "mask_former" module
@@ -303,6 +304,8 @@ def main(args):
         register_coco_instances('armbench_train', {}, 'datasets/armbench/mix-object-tote/train.json', 'datasets/armbench/mix-object-tote/images')
     if 'armbench_val' in cfg.DATASETS.TEST:
         register_coco_instances('armbench_val', {}, 'datasets/armbench/mix-object-tote/val.json', 'datasets/armbench/mix-object-tote/images')
+    if 'armbench_test' in cfg.DATASETS.TEST:
+        register_coco_instances('armbench_test', {}, 'datasets/armbench/mix-object-tote/test.json', 'datasets/armbench/mix-object-tote/images')
     
     if args.eval_only:
         model = Trainer.build_model(cfg)
