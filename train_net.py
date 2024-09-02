@@ -306,6 +306,13 @@ def main(args):
         register_coco_instances('armbench_val', {}, 'datasets/armbench/mix-object-tote/val.json', 'datasets/armbench/mix-object-tote/images')
     if 'armbench_test' in cfg.DATASETS.TEST:
         register_coco_instances('armbench_test', {}, 'datasets/armbench/mix-object-tote/test.json', 'datasets/armbench/mix-object-tote/images')
+
+    if 'armbench_train_class1' in cfg.DATASETS.TRAIN:
+        register_coco_instances('armbench_train_class1', {}, 'datasets/armbench/mix-object-tote/train.json', 'datasets/armbench/mix-object-tote/images')
+    if 'armbench_val_class1' in cfg.DATASETS.TEST:
+        register_coco_instances('armbench_val_class1', {}, 'datasets/armbench/mix-object-tote/val.json', 'datasets/armbench/mix-object-tote/images')
+    if 'armbench_test_class1' in cfg.DATASETS.TEST:
+        register_coco_instances('armbench_test_class1', {}, 'datasets/armbench/mix-object-tote/test.json', 'datasets/armbench/mix-object-tote/images')
     
     if args.eval_only:
         model = Trainer.build_model(cfg)
