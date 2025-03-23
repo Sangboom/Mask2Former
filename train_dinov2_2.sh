@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=5
 
 # python train_net.py --num-gpus 8 \
 #   --config-file configs/coco/instance-segmentation/maskformer2_R50_bs16_1x_ms.yaml --resume --eval-only
@@ -10,5 +10,9 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 # python train_net.py --num-gpus 4 \
 #   --config-file configs/coco/instance-segmentation/maskformer2_R50_bs16_50ep.yaml
 
-python train_net.py --num-gpus 4 \
-  --config-file configs/coco/instance-segmentation/swin/maskformer2_swin_base_IN21k_384_bs16_50ep.yaml
+# python train_net.py --num-gpus 4 \
+#   --config-file configs/coco/instance-segmentation/dinov2/maskformer2_dinov2_base_bs16_50ep.yaml --dist-url='tcp://127.0.0.1:8475'
+
+
+python train_net.py --num-gpus 1 \
+  --config-file configs/coco/instance-segmentation/dinov2/maskformer2_dinov2_base_rein_bs16_50ep.yaml --dist-url='tcp://127.0.0.1:8476'

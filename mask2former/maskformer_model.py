@@ -12,9 +12,11 @@ from detectron2.modeling.backbone import Backbone
 from detectron2.modeling.postprocessing import sem_seg_postprocess
 from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.layers import ShapeSpec
 
 from .modeling.criterion import SetCriterion
 from .modeling.matcher import HungarianMatcher
+from .modeling.backbone.rein_dino_v2 import D2DinoVisionTransformer
 
 
 @META_ARCH_REGISTRY.register()
@@ -95,7 +97,39 @@ class MaskFormer(nn.Module):
 
     @classmethod
     def from_config(cls, cfg):
-        backbone = build_backbone(cfg)
+        if cfg.MODEL.BACKBONE.NAME == "D2DINOv2Transformer":
+            input_shape = ShapeSpec(channels=len(cfg.MODEL.PIXEL_MEAN))
+            backbone = D2DinoVisionTransformer(cfg, input_shape)
+            
+            # backbone_dino.load_state_dict(torch.load(cfg.MODEL.DINO_WEIGHTS))
+            # backbone_dino.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitb14_reg4_pretrain.pth'))
+            if cfg.INPUT.IMAGE_SIZE == 512:
+                backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_converted_512.pth'), strict=False)
+            else:
+                if cfg.MODEL.DINOV2.SIZE == 'large':
+                    backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitl14_converted_k16h256w256.pth'), strict=False)
+                else:
+                    backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_converted_256.pth'), strict=False)
+            
+            if cfg.MODEL.DINOV2.FREEZE_BACKBONE:
+                panet_dino_layers = ['cross_view_attn', 'cross_layer_norm', 'res_to_trans', 'trans_to_res']
+                if cfg.MODEL.DINOV2.ADAPTER:
+                    if cfg.MODEL.DINOV2.ADAPTER_TYPE == "reins":
+                        panet_dino_layers += ['reins']
+                for name, param in backbone.named_parameters():
+                    if cfg.MODEL.DINOV2.ADAPTER and any([layer in name for layer in panet_dino_layers]):
+                        print(f'Not freezing {name}')
+                        continue
+                    else:
+                        print(f"freeze {name}")
+                        param.requires_grad = False
+            else:
+                for name, param in backbone.named_parameters():
+                    print(f"unfreeze {name}")
+                    param.requires_grad = True
+
+        else:
+            backbone = build_backbone(cfg)
         sem_seg_head = build_sem_seg_head(cfg, backbone.output_shape())
 
         # Loss parameters:

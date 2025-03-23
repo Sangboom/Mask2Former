@@ -13,91 +13,15 @@ from torch.nn.init import trunc_normal_
 import torch.nn.functional as F
 import fvcore.nn.weight_init as weight_init
 
-from odin.modeling.backbone.dinov2_layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
-from odin.modeling.backbone.dino_v2 import DinoVisionTransformer
-from odin.modeling.backbone.reins import Reins
-from odin.modeling.backbone.dino_rein_utils import set_requires_grad, set_train
-from odin.modeling.meta_arch.cross_view_attention import CrossViewPAnet
+from mask2former.modeling.backbone.dinov2_layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
+from mask2former.modeling.backbone.dino_v2 import DinoVisionTransformer
+from mask2former.modeling.backbone.reins import Reins
+from mask2former.modeling.backbone.dino_rein_utils import set_requires_grad, set_train
+# from mask2former.modeling.meta_arch.cross_view_attention import CrossViewPAnet
 
 from detectron2.modeling import BACKBONE_REGISTRY, Backbone, ShapeSpec
 from detectron2.layers import CNNBlockBase, Conv2d, get_norm
 from detectron2.modeling.backbone.fpn import _assert_strides_are_log2_contiguous
-
-
-
-
-class CrossViewLayer(nn.Module):
-    """Cross View Attention Layer which translate to 3D and apply cross view attention.
-    Args:
-        dim (int): Number of feature channels
-    """
-
-    def __init__(
-        self,
-        dim,
-        cfg=None,
-        layer_i=None
-    ):
-        super().__init__()
-        
-        self.cfg = cfg
-
-        if cfg.MODEL.CROSS_VIEW_BACKBONE:
-            # we don't find much benefit doing cross view attention in the first layer
-            # and it's expensive, so we only do it in the later layers
-            if layer_i == 0:
-                self.cross_view_attention = False
-            else:
-                self.cross_view_attention = True
-                conv_dim = cfg.MODEL.SEM_SEG_HEAD.CONVS_DIM
-                self.res_to_trans = nn.Sequential(
-                        nn.Conv2d(dim, conv_dim, kernel_size=1),
-                        nn.GroupNorm(32, conv_dim),
-                    )
-                weight_init.c2_xavier_fill(self.res_to_trans[0])
-                self.cross_view_attn = CrossViewPAnet(
-                        latent_dim=conv_dim, nsample=self.cfg.MODEL.KNN,
-                        dropout=self.cfg.MODEL.MASK_FORMER.DROPOUT, num_layers=self.cfg.MODEL.CROSS_VIEW_NUM_LAYERS[layer_i],
-                        cfg=cfg
-                    )
-                self.trans_to_res = nn.Sequential(
-                        nn.Conv2d(conv_dim, dim, kernel_size=1),
-                        nn.GroupNorm(32, dim),
-                    )
-                weight_init.c2_xavier_fill(self.trans_to_res[0])
-                # self.cross_layer_norm = nn.LayerNorm(dim)
-
-
-    def forward(self, x, H, W, x_xyz=None, shape=None, multiview_data=None, decoder_3d=False):
-        """Forward function.
-        Args:
-            x: Input feature, tensor size (B, H*W, C).
-            H, W: Spatial resolution of the input feature.
-        """
-
-        if decoder_3d and self.cfg.MODEL.CROSS_VIEW_BACKBONE and self.cross_view_attention:
-
-            # project x
-            x2 = x.view(x.shape[0], H, W, -1).permute(0, 3, 1, 2).contiguous()
-            x2 = self.res_to_trans(x2)
-
-            # cross view attention
-            x2 = self.cross_view_attn(
-                feature_list=[x2],
-                xyz_list=x_xyz,
-                shape=shape[:2],
-                multiview_data=multiview_data,
-                voxelize=self.cfg.INPUT.VOXELIZE
-            )[0]
-
-            # project back
-            x2 = self.trans_to_res(x2)
-            x2 = x2.permute(0, 2, 3, 1).flatten(1, 2).contiguous()
-            
-            # skip connection
-            x = x + x2
-        
-        return x, H, W
 
 
 
@@ -275,7 +199,8 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
         # embed_dim = cfg.MODEL.SWIN.EMBED_DIM
         embed_dim = kwargs['embed_dim']
 
-        self.simple_fpn = cfg.MODEL.SIMPLE_FPN
+        # self.simple_fpn = cfg.MODEL.SIMPLE_FPN
+        
 
         self.cfg = cfg
         self.num_layers = 4
@@ -299,14 +224,6 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
             "res5": embed_dim,
         }
 
-        self.layers = nn.ModuleList()
-        for i_layer in range(self.num_layers):
-            layer = CrossViewLayer(
-                dim=int(embed_dim),
-                cfg=cfg,
-                layer_i=i_layer
-            )
-            self.layers.append(layer)
         
 
     def forward_features(self, x, masks=None, x_xyz=None, shape=None, multiview_data=None, decoder_3d=False):
@@ -317,9 +234,7 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
         # outs = []
 
         for idx, blk in enumerate(self.blocks):
-            print(f"Before block {idx}: {x.requires_grad}")
             x = blk(x)
-            print(f"After block {idx}: {x.requires_grad}")
             if self.is_adapter:
                 if self.adapter_type == 'rein':
                     x = self.reins.forward(
@@ -329,42 +244,6 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
                         has_cls_token=True,
                     )
             
-            if idx in self.out_indices:
-                if self.cfg.MODEL.CROSS_VIEW_BACKBONE and decoder_3d:
-                    mv_data = {}
-                    if self.cfg.MODEL.DINOV2.SIZE == 'base':
-                        mv_data['multi_scale_p2v'] = [multiview_data['multi_scale_p2v'][self.xyz_dict[f"res{int((idx+1)/3 + 1)}"]]]
-                    elif self.cfg.MODEL.DINOV2.SIZE == 'large':
-                        mv_data['multi_scale_p2v'] = [multiview_data['multi_scale_p2v'][self.xyz_dict[f"res{int((idx+1)/6 + 1)}"]]]
-
-                    # mv_data['multi_scale_p2v'] = [multiview_data['multi_scale_p2v'][self.xyz_dict[f"res{idx+2}"]]]
-                    # mv_data['multi_scale_p2v'] = [multiview_data['multi_scale_p2v'][1]]
-                    
-                    if self.cfg.MODEL.DINOV2.SIZE == 'base':
-                        xyz = [x_xyz[self.xyz_dict[f"res{int((idx+1)/3 + 1)}"]]]
-                        # xyz = [x_xyz[self.xyz_dict[f"res{idx+2}"]]]
-                        # xyz = [x_xyz[1]]
-                        layer = self.layers[int((idx+1)/3 - 1)]
-                        # layer = self.layers[idx]
-                    elif self.cfg.MODEL.DINOV2.SIZE == 'large':
-                        xyz = [x_xyz[self.xyz_dict[f"res{int((idx+1)/6 + 1)}"]]]
-                        layer = self.layers[int((idx+1)/6 - 1)]
-
-                    x_cls = x[:, 0:1, :]
-                    x_reg = x[:, 1:, :]
-
-                    x_out, H, W = layer(
-                        x_reg, H, W, 
-                        x_xyz=xyz, shape=shape, multiview_data=mv_data, 
-                        decoder_3d=decoder_3d)
-                    x = torch.cat([x_cls, x_out], dim=1)
-                else:
-                    mv_data = None
-                    xyz = None
-            else:
-                mv_data = None
-                xyz = None
-            
             
             if idx in self.out_indices:
                 # norm_layer = getattr(self, f"norm{idx}")
@@ -373,10 +252,7 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
                 # x_out = x[:, 1:, :]
                 # x_out = x[:, 1:, :]
                 # x_out[:, 0, :] = x_out[:, 0, :] + x[:, 0, :]
-                if self.cfg.MODEL.CROSS_VIEW_BACKBONE:
-                    out = x_out.view(-1, H, W, self.num_features).permute(0, 3, 1, 2).contiguous()
-                else:
-                    out = x[:, 1:, :].view(-1, H, W, self.num_features).permute(0, 3, 1, 2).contiguous()
+                out = x[:, 1:, :].view(-1, H, W, self.num_features).permute(0, 3, 1, 2).contiguous()
                 # out = x_out.view(-1, H, W, self.num_features[idx]).permute(0, 3, 1, 2).contiguous()
 
                 if self.cfg.MODEL.DINOV2.SIZE == 'base':
@@ -384,10 +260,10 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
                 elif self.cfg.MODEL.DINOV2.SIZE == 'large':
                     outs["res{}".format(int((idx+1)/6 + 1))] = out
         
-        if self.simple_fpn == False:
-            outs["res2"] = F.interpolate(outs["res2"], scale_factor=4, mode="bilinear", align_corners=False)
-            outs["res3"] = F.interpolate(outs["res3"], scale_factor=2, mode="bilinear", align_corners=False)
-            outs["res5"] = F.interpolate(outs["res5"], scale_factor=0.5, mode="bilinear", align_corners=False)
+        # if self.simple_fpn == False:
+        outs["res2"] = F.interpolate(outs["res2"], scale_factor=4, mode="bilinear", align_corners=False)
+        outs["res3"] = F.interpolate(outs["res3"], scale_factor=2, mode="bilinear", align_corners=False)
+        outs["res5"] = F.interpolate(outs["res5"], scale_factor=0.5, mode="bilinear", align_corners=False)
         
         for name, param in self.named_parameters():
             if not param.requires_grad:
@@ -444,26 +320,15 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
         if not self.cfg.MODEL.DINOV2.FREEZE_BACKBONE:
             # for name, param in self.named_parameters():
             #     param.requires_grad = True
-            if self.cfg.MODEL.CROSS_VIEW_BACKBONE:
-                set_requires_grad(self, ["cls_token", "pos_embed", "patch_embed", "blocks", "layers"])
-                set_train(self, ["cls_token", "pos_embed", "patch_embed", "blocks", "layers"])
-            else:
-                set_requires_grad(self, ["cls_token", "pos_embed", "patch_embed", "blocks"])
-                set_train(self, ["cls_token", "pos_embed", "patch_embed", "blocks"])
+            set_requires_grad(self, ["cls_token", "pos_embed", "patch_embed", "blocks"])
+            set_train(self, ["cls_token", "pos_embed", "patch_embed", "blocks"])
 
         else:
             if self.is_adapter and self.adapter_type == 'rein':
                 # Setting Rein Train
-                if self.cfg.MODEL.CROSS_VIEW_BACKBONE:
-                    # set_requires_grad(self, ["reins", "layers"])
-                    # set_train(self, ["reins", "layers"])
-                    set_requires_grad(self, ["reins"])
-                    set_train(self, ["reins"])
-                    set_requires_grad(self, ["layers"])
-                    set_train(self, ["layers"])
-                else:
-                    set_requires_grad(self, ["reins"])
-                    set_train(self, ["reins"])
+
+                set_requires_grad(self, ["reins"])
+                set_train(self, ["reins"])
             
             # if self.cfg.MODEL.CROSS_VIEW_BACKBONE:
             #     # Setting Crossview attn 
@@ -480,8 +345,7 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
         
         # exit()
 
-
-class D2SDinoVisionTransformer(ReinsDinoVisionTransformer, Backbone):
+class D2DinoVisionTransformer(ReinsDinoVisionTransformer, Backbone):
     def __init__(self, cfg, input_shape):
         patch_size=16
         num_register_tokens=0

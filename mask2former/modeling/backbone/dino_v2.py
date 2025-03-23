@@ -18,7 +18,7 @@ import torch.utils.checkpoint
 import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 
-from odin.modeling.backbone.dinov2_layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
+from mask2former.modeling.backbone.dinov2_layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
 from detectron2.modeling import BACKBONE_REGISTRY, Backbone, ShapeSpec
 from detectron2.layers import CNNBlockBase, Conv2d, get_norm
 from detectron2.modeling.backbone.fpn import _assert_strides_are_log2_contiguous

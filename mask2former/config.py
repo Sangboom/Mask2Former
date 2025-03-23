@@ -89,6 +89,12 @@ def add_maskformer2_config(cfg):
     cfg.MODEL.SWIN.OUT_FEATURES = ["res2", "res3", "res4", "res5"]
     cfg.MODEL.SWIN.USE_CHECKPOINT = False
 
+    cfg.MODEL.DINOV2 = CN()
+    cfg.MODEL.DINOV2.SIZE = 'base'
+    cfg.MODEL.DINOV2.FREEZE_BACKBONE = True
+    cfg.MODEL.DINOV2.ADAPTER = False
+    cfg.MODEL.DINOV2.ADAPTER_TYPE = 'rein'
+
     # NOTE: maskformer2 extra configs
     # transformer module
     cfg.MODEL.MASK_FORMER.TRANSFORMER_DECODER_NAME = "MultiScaleMaskedTransformerDecoder"
