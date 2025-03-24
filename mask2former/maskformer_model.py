@@ -17,6 +17,7 @@ from detectron2.layers import ShapeSpec
 from .modeling.criterion import SetCriterion
 from .modeling.matcher import HungarianMatcher
 from .modeling.backbone.rein_dino_v2 import D2DinoVisionTransformer
+from .modeling.backbone.dino_v2_vitadapter import D2DinoViTAdapter
 
 
 @META_ARCH_REGISTRY.register()
@@ -99,7 +100,12 @@ class MaskFormer(nn.Module):
     def from_config(cls, cfg):
         if cfg.MODEL.BACKBONE.NAME == "D2DINOv2Transformer":
             input_shape = ShapeSpec(channels=len(cfg.MODEL.PIXEL_MEAN))
-            backbone = D2DinoVisionTransformer(cfg, input_shape)
+            if cfg.MODEL.DINOV2.ADAPTER_TYPE == 'vitadapter':
+                # DINOv2 w/ ViT-adapter
+                backbone = D2DinoViTAdapter(cfg, input_shape)
+            else:
+                # Rein adapter & DINOv2 w/o adapter
+                backbone = D2DinoVisionTransformer(cfg, input_shape)
             
             # backbone_dino.load_state_dict(torch.load(cfg.MODEL.DINO_WEIGHTS))
             # backbone_dino.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitb14_reg4_pretrain.pth'))
@@ -116,6 +122,8 @@ class MaskFormer(nn.Module):
                 if cfg.MODEL.DINOV2.ADAPTER:
                     if cfg.MODEL.DINOV2.ADAPTER_TYPE == "reins":
                         panet_dino_layers += ['reins']
+                    elif cfg.MODEL.DINOV2.ADAPTER_TYPE == 'vitadatper':
+                        panet_dino_layers += ['']
                 for name, param in backbone.named_parameters():
                     if cfg.MODEL.DINOV2.ADAPTER and any([layer in name for layer in panet_dino_layers]):
                         print(f'Not freezing {name}')
