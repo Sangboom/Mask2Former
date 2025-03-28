@@ -41,7 +41,7 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
         if cfg.MODEL.DINOV2.SIZE == 'base':
             interaction_indexes=[[0, 2], [3, 5], [6, 8], [9, 11]] # for base
         else:
-            interaction_indexes=None # Not implementatio
+            interaction_indexes=None # Not implementation
             
         with_cffn=True
         cffn_ratio=0.25
@@ -97,12 +97,6 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
         normal_(self.level_embed)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
-
-        # 3D Cross View Attention
-        # embed_dim = cfg.MODEL.SWIN.EMBED_DIM
-        # embed_dim = kwargs['embed_dim']
-
-        # self.simple_fpn = cfg.MODEL.SIMPLE_FPN
 
         self.cfg = cfg
         self.num_layers = 4
@@ -178,7 +172,7 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
 
         # Patch Embedding forward
         # x, H, W = self.patch_embed(x)
-        B, nc, w, h = x.shape
+        B, nc, h, w = x.shape
         H, W = h // self.patch_size, w // self.patch_size
         x = self.patch_embed(x)
         bs, n, dim = x.shape
@@ -191,30 +185,6 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
             indexes = self.interaction_indexes[i]
             x, c = vitadapter_layer(x, c, self.blocks[indexes[0]:indexes[-1] + 1],
                          deform_inputs1, deform_inputs2, H, W)
-            # if self.cfg.MODEL.CROSS_VIEW_BACKBONE and decoder_3d:
-            #     mv_data = {}
-            #     mv_data['multi_scale_p2v'] = [multiview_data['multi_scale_p2v'][self.xyz_dict[f"res{int(i+2)}"]]]
-            #     xyz = [x_xyz[self.xyz_dict[f"res{int(i+2)}"]]]
-            #     layer = self.layers[int(i)]
-
-            #     if i == 1:
-            #         c_3d = c[:, 0:c2.size(1), :]
-            #         # c_3d = c_3d.transpose(1, 2).view(bs, dim, H * 2, W * 2).contiguous()
-            #     elif i == 2:
-            #         c_3d = c[:, c2.size(1):c2.size(1) + c3.size(1), :]
-            #         # c_3d = c_3d.transpose(1, 2).view(bs, dim, H, W).contiguous()
-            #     elif i == 3:
-            #         c_3d = c[:, c2.size(1) + c3.size(1):, :]
-            #         # c_3d = c_3d.transpose(1, 2).view(bs, dim, H // 2, W // 2).contiguous()
-            #     else:
-            #         c_3d = None
-
-            #     x_out, H, W = layer(
-            #         c_3d, H, W, x_xyz=xyz, 
-            #         shape=shape, multiview_data=mv_data, 
-            #         decoder_3d=decoder_3d)
-                
-
             outs.append(x.transpose(1, 2).view(bs, dim, H, W).contiguous())
         
         # Split & Reshape
@@ -225,7 +195,11 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
         c2 = c2.transpose(1, 2).view(bs, dim, H * 2, W * 2).contiguous()
         c3 = c3.transpose(1, 2).view(bs, dim, H, W).contiguous()
         c4 = c4.transpose(1, 2).view(bs, dim, H // 2, W // 2).contiguous()
+        # print("c1 shape", c1.shape)
+        # print("c2 shape", c2.shape)
+        # print("c2 up shape", self.up(c2).shape)
         c1 = self.up(c2) + c1
+        
 
         if self.add_vit_feature:
             x1, x2, x3, x4 = outs
@@ -245,6 +219,12 @@ class ViTAdapterDinoVisionTransformer(DinoVisionTransformer):
         outs["res3"] = f2
         outs["res4"] = f3
         outs["res5"] = f4
+
+        for name, param in self.named_parameters():
+            if not param.requires_grad:
+                print(f"{name} is frozen!")
+            else:
+                print(f"{name} is trainable!")
         
         return outs
 

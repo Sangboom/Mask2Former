@@ -15,4 +15,4 @@ export CUDA_VISIBLE_DEVICES=4,5
 
 
 python train_net.py --num-gpus 2 \
-  --config-file configs/coco/instance-segmentation/dinov2/maskformer2_dinov2_base_vitadapter_bs16_50ep.yaml --dist-url='tcp://127.0.0.1:8478'
+  --resume --config-file configs/coco/instance-segmentation/dinov2/maskformer2_dinov2_base_vitadapter_bs16_50ep.yaml --dist-url='tcp://127.0.0.1:8478'
