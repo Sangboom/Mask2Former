@@ -15,7 +15,7 @@ import fvcore.nn.weight_init as weight_init
 
 from mask2former.modeling.backbone.dinov2_layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
 from mask2former.modeling.backbone.dino_v2 import DinoVisionTransformer
-from mask2former.modeling.backbone.reins import Reins
+from mask2former.modeling.backbone.reins import Reins, AdaptFormer
 from mask2former.modeling.backbone.dino_rein_utils import set_requires_grad, set_train
 # from mask2former.modeling.meta_arch.cross_view_attention import CrossViewPAnet
 
@@ -195,6 +195,13 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
                     embed_dims = kwargs['embed_dim'],
                     patch_size = kwargs['patch_size'],
                 )
+            elif self.adapter_type == 'adaptformer':
+                self.adaptformer = AdaptFormer(
+                    lora_dim = 64,
+                    num_layers = kwargs['depth'],
+                    embed_dims = kwargs['embed_dim'],
+                    patch_size = kwargs['patch_size'],
+                )
         
         # embed_dim = cfg.MODEL.SWIN.EMBED_DIM
         embed_dim = kwargs['embed_dim']
@@ -238,6 +245,13 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
             if self.is_adapter:
                 if self.adapter_type == 'rein':
                     x = self.reins.forward(
+                        x,
+                        idx,
+                        batch_first=True,
+                        has_cls_token=True,
+                    )
+                elif self.adapter_type == 'adaptformer':
+                    x = self.adaptformer.forward(
                         x,
                         idx,
                         batch_first=True,
@@ -324,11 +338,17 @@ class ReinsDinoVisionTransformer(DinoVisionTransformer):
             set_train(self, ["cls_token", "pos_embed", "patch_embed", "blocks"])
 
         else:
-            if self.is_adapter and self.adapter_type == 'rein':
-                # Setting Rein Train
+            if self.is_adapter:
+                if self.adapter_type == 'rein':
+                    # Setting Rein Train
 
-                set_requires_grad(self, ["reins"])
-                set_train(self, ["reins"])
+                    set_requires_grad(self, ["reins"])
+                    set_train(self, ["reins"])
+                elif self.adapter_type == 'adaptformer':
+                    # Setting AdaptFormer Train
+
+                    set_requires_grad(self, ["adaptformer"])
+                    set_train(self, ["adaptformer"])
             
             # if self.cfg.MODEL.CROSS_VIEW_BACKBONE:
             #     # Setting Crossview attn 

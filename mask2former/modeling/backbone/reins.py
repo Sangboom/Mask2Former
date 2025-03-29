@@ -111,3 +111,47 @@ class Reins(nn.Module):
         )
         delta_f = self.mlp_delta_f(delta_f + feats)
         return delta_f
+
+
+class AdaptFormer(Reins):
+    def __init__(self, lora_dim, act_layer='ReLU', bottleneck_dim=64, **kwargs):
+        self.lora_dim = lora_dim
+        self.act_layer = act_layer
+        self.bottleneck_dim = bottleneck_dim
+        super().__init__(**kwargs)
+        
+    def create_model(self):
+        self.scale = nn.ParameterList([nn.Parameter(torch.tensor(self.scale_init)) for _ in range(self.num_layers)])
+
+        self.mlp_delta_f_1 = nn.ModuleList([nn.Linear(self.embed_dims, self.bottleneck_dim) for _ in range(self.num_layers)])
+        self.mlp_delta_f_2 = nn.ModuleList([nn.Linear(self.bottleneck_dim, self.embed_dims) for _ in range(self.num_layers)])
+        self.activation = getattr(nn, self.act_layer)()
+
+    def forward(
+        self, feats: Tensor, layer: int, batch_first=False, has_cls_token=True, pos_embed=None
+    ) -> Tensor:
+        if batch_first:
+            feats = feats.permute(1, 0, 2)
+        if has_cls_token:
+            cls_token, feats = torch.tensor_split(feats, [1], dim=0)
+        delta_feat = self.forward_delta_feat(
+            feats,
+            layer,
+            pos_embed
+        )
+        delta_feat = delta_feat * self.scale[layer]
+        feats = feats + delta_feat
+        if has_cls_token:
+            feats = torch.cat([cls_token, feats], dim=0)
+        if batch_first:
+            feats = feats.permute(1, 0, 2)
+        return feats
+
+    def forward_delta_feat(self, feats: Tensor, layers: int) -> Tensor:
+        '''
+            feats: (L, B, C)
+        '''
+        delta_f = self.mlp_delta_f_1[layers](feats)
+        delta_f = self.activation(delta_f)
+        delta_f = self.mlp_delta_f_2[layers](delta_f)
+        return delta_f
