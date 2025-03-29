@@ -136,8 +136,8 @@ class AdaptFormer(Reins):
             cls_token, feats = torch.tensor_split(feats, [1], dim=0)
         delta_feat = self.forward_delta_feat(
             feats,
-            layer,
-            pos_embed
+            layer
+            # pos_embed
         )
         delta_feat = delta_feat * self.scale[layer]
         feats = feats + delta_feat
