@@ -1,0 +1,35 @@
+_BASE_: ../maskformer2_R50_bs16_50ep.yaml
+MODEL:
+  BACKBONE:
+    NAME: "D2DINOv2Transformer"
+  DINOV2:
+    SIZE: 'base'
+    FREEZE_BACKBONE: True
+    ADAPTER: True
+    ADAPTER_TYPE: 'adaptformer'
+
+  # SWIN:
+  #   EMBED_DIM: 128
+  #   DEPTHS: [2, 2, 18, 2]
+  #   NUM_HEADS: [4, 8, 16, 32]
+  #   WINDOW_SIZE: 12
+  #   APE: False
+  #   DROP_PATH_RATE: 0.3
+  #   PATCH_NORM: True
+  #   PRETRAIN_IMG_SIZE: 384
+  # WEIGHTS: "swin_base_patch4_window12_384_22k.pkl"
+  WEIGHTS: "dinov2_vitb14_converted_1024x1024.pth"
+  # WEIGHTS: "dinov2_converted_256.pth"
+  PIXEL_MEAN: [123.675, 116.280, 103.530]
+  PIXEL_STD: [58.395, 57.120, 57.375]
+# INPUT:
+#   IMAGE_SIZE: 256
+#   MIN_SCALE: 1.0
+#   MAX_SCALE: 1.0
+#   FORMAT: "RGB"
+#   DATASET_MAPPER_NAME: "coco_instance_lsj"
+SOLVER:
+  IMS_PER_BATCH: 4
+  BASE_LR: 0.000025
+  STEPS: (1311112, 1420368)
+  MAX_ITER: 1475000

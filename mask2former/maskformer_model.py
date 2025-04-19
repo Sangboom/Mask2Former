@@ -111,6 +111,8 @@ class MaskFormer(nn.Module):
             # backbone_dino.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitb14_reg4_pretrain.pth'))
             if cfg.INPUT.IMAGE_SIZE == 512:
                 backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_converted_512.pth'), strict=False)
+            elif cfg.INPUT.IMAGE_SIZE == 1024:
+                backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitb14_converted_1024x1024.pth'), strict=False)
             else:
                 if cfg.MODEL.DINOV2.SIZE == 'large':
                     backbone.load_state_dict(torch.load('../odin_m2f_weight/dinov2_vitl14_converted_k16h256w256.pth'), strict=False)
