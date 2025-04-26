@@ -57,6 +57,7 @@ class Block(nn.Module):
         norm_layer: Callable[..., nn.Module] = nn.LayerNorm,
         attn_class: Callable[..., nn.Module] = Attention,
         ffn_layer: Callable[..., nn.Module] = Mlp,
+        **kwargs,
     ) -> None:
         super().__init__()
         # print(f"biases: qkv: {qkv_bias}, proj: {proj_bias}, ffn: {ffn_bias}")
@@ -68,6 +69,7 @@ class Block(nn.Module):
             proj_bias=proj_bias,
             attn_drop=attn_drop,
             proj_drop=drop,
+            **kwargs,
         )
         self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.drop_path1 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()

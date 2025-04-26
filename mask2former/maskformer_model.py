@@ -18,6 +18,7 @@ from .modeling.criterion import SetCriterion
 from .modeling.matcher import HungarianMatcher
 from .modeling.backbone.rein_dino_v2 import D2DinoVisionTransformer
 from .modeling.backbone.dino_v2_vitadapter import D2DinoViTAdapter
+from .modeling.backbone.lora_variant_dino_v2 import D2LoRAVariantDinoVisionTransformer
 
 
 @META_ARCH_REGISTRY.register()
@@ -103,6 +104,8 @@ class MaskFormer(nn.Module):
             if cfg.MODEL.DINOV2.ADAPTER_TYPE == 'vitadapter':
                 # DINOv2 w/ ViT-adapter
                 backbone = D2DinoViTAdapter(cfg, input_shape)
+            elif cfg.MODEL.DINOV2.ADAPTER_TYPE == 'loraqkvm':
+                backbone = D2LoRAVariantDinoVisionTransformer(cfg, input_shape)
             else:
                 # Rein adapter & DINOv2 w/o adapter
                 backbone = D2DinoVisionTransformer(cfg, input_shape)

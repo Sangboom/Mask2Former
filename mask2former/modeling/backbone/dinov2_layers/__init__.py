@@ -9,3 +9,5 @@ from .patch_embed import PatchEmbed
 from .swiglu_ffn import SwiGLUFFN, SwiGLUFFNFused
 from .block import NestedTensorBlock
 from .attention import MemEffAttention
+from .attention_qkv_split import MemEffLoRAQKVSplitAttention
+from .mlp_lora import LoRAMlp
